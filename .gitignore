@@ -2,6 +2,8 @@
 PrivacyScreen.app/
 *.o
 *.swiftmodule
+Windows/bin/
+Windows/obj/
 
 # macOS
 .DS_Store
