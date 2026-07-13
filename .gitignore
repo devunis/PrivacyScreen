@@ -1,0 +1,7 @@
+# 빌드 산출물
+PrivacyScreen.app/
+*.o
+*.swiftmodule
+
+# macOS
+.DS_Store
