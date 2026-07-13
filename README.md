@@ -1,6 +1,6 @@
 # PrivacyScreen
 
-선택한 앱의 창만 어두운 덮개로 가려, 옆·뒤 사람의 훔쳐보기를 줄이는 macOS 메뉴바 유틸리티.
+선택한 앱의 창만 어두운 덮개로 가려, 옆·뒤 사람의 훔쳐보기를 줄이는 데스크톱 유틸리티.
 
 메뉴바에서 가릴 앱을 고르고 토글하면, 그 앱(예: 메신저·메일)의 창이 어두워집니다.
 덮개는 클릭이 통과되어 가려진 상태에서도 그 앱을 조작할 수 있습니다.
@@ -19,10 +19,10 @@
 
 ## 요구 사항
 
-- macOS 13 이상 (일부 기능은 macOS 14+)
-- Xcode 커맨드라인 도구(`swiftc`)
+- **macOS**: macOS 13 이상 (일부 기능은 macOS 14+) + Xcode 커맨드라인 도구(`swiftc`)
+- **Windows**: Windows 10 이상 + .NET 8 SDK
 
-## 빌드 & 실행
+## 빌드 & 실행 (macOS)
 
 ```bash
 ./build.sh          # PrivacyScreen.app 생성
@@ -35,9 +35,23 @@ open PrivacyScreen.app
 cp -R PrivacyScreen.app /Applications/
 ```
 
+## 빌드 & 실행 (Windows)
+
+```powershell
+.\build-windows.ps1
+```
+
+실행 파일:
+
+```text
+Windows\bin\Release\net8.0-windows10.0.17763.0\win-x64\publish\PrivacyScreen.Windows.exe
+```
+
+Windows 버전은 프로세스 이름 기준으로 대상을 선택해 저장하며, 로그인 시 자동 실행 토글은 현재 포함하지 않았습니다.
+
 ## 사용법
 
-메뉴바의 눈 아이콘(`eye.slash`) 클릭 →
+macOS는 메뉴바 아이콘, Windows는 트레이 아이콘을 클릭 →
 
 1. **대상 앱 선택** 에서 가릴 앱을 체크(여러 개 가능)
 2. **가리기 켜기**
@@ -60,6 +74,14 @@ Sources/
   WindowCoverController.swift  # 창 추적 + 덮개 렌더링
   StatusBarController.swift    # 메뉴바 UI
 build.sh                       # swiftc → PrivacyScreen.app
+build-windows.ps1              # dotnet publish → PrivacyScreen.Windows.exe
+Windows/
+  Program.cs                   # WinForms 진입점
+  PrivacyScreenAppContext.cs   # 트레이 UI + 창 추적 + 오버레이 갱신
+  OverlayForm.cs               # 클릭 통과 오버레이 렌더링
+  Win32.cs                     # 창 열거/속성 Win32 래퍼
+  AppSettings.cs               # AppData 설정 로드/저장
+  PrivacyScreen.Windows.csproj # Windows 빌드 타깃
 Info.plist
 docs/…/*-design.md             # 설계 문서
 ```
