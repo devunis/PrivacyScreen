@@ -6,10 +6,19 @@ final class StatusBarController: NSObject, NSMenuDelegate {
     private let statusItem: NSStatusItem
     private let cover: WindowCoverController
     private let onAlphaChange: (CGFloat) -> Void
+    private let onFrontalFocusEnabledChange: (Bool) -> Void
+    private let onFrontalFocusWidthChange: (CGFloat) -> Void
 
-    init(cover: WindowCoverController, onAlphaChange: @escaping (CGFloat) -> Void) {
+    init(
+        cover: WindowCoverController,
+        onAlphaChange: @escaping (CGFloat) -> Void,
+        onFrontalFocusEnabledChange: @escaping (Bool) -> Void,
+        onFrontalFocusWidthChange: @escaping (CGFloat) -> Void
+    ) {
         self.cover = cover
         self.onAlphaChange = onAlphaChange
+        self.onFrontalFocusEnabledChange = onFrontalFocusEnabledChange
+        self.onFrontalFocusWidthChange = onFrontalFocusWidthChange
         self.statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
 
@@ -67,6 +76,8 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         menu.addItem(pick)
 
         menu.addItem(makeDarknessSliderItem())
+        menu.addItem(makeFrontalFocusToggleItem())
+        menu.addItem(makeFrontalFocusWidthSliderItem())
 
         menu.addItem(NSMenuItem.separator())
 
@@ -146,10 +157,59 @@ final class StatusBarController: NSObject, NSMenuDelegate {
         return item
     }
 
+    private func makeFrontalFocusToggleItem() -> NSMenuItem {
+        let item = NSMenuItem(
+            title: "세로선 프라이버시 필터 (소프트웨어)",
+            action: #selector(toggleFrontalFocus),
+            keyEquivalent: ""
+        )
+        item.target = self
+        item.state = cover.frontalFocusEnabled ? .on : .off
+        return item
+    }
+
+    private func makeFrontalFocusWidthSliderItem() -> NSMenuItem {
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: 220, height: 46))
+
+        let label = NSTextField(labelWithString: "세로선 간격")
+        label.font = NSFont.systemFont(ofSize: 12)
+        label.textColor = .secondaryLabelColor
+        label.frame = NSRect(x: 14, y: 26, width: 190, height: 16)
+        container.addSubview(label)
+
+        let slider = NSSlider(
+            value: Double(cover.frontalFocusWidth),
+            minValue: 0.25,
+            maxValue: 1.0,
+            target: self,
+            action: #selector(frontalFocusWidthChanged(_:))
+        )
+        slider.isContinuous = true
+        slider.frame = NSRect(x: 14, y: 4, width: 192, height: 20)
+        slider.isEnabled = cover.frontalFocusEnabled
+        container.addSubview(slider)
+
+        let item = NSMenuItem()
+        item.view = container
+        return item
+    }
+
     @objc private func alphaSliderChanged(_ sender: NSSlider) {
         let alpha = CGFloat(sender.doubleValue)
         cover.setAlpha(alpha)
         onAlphaChange(alpha)
+    }
+
+    @objc private func toggleFrontalFocus() {
+        let newValue = !cover.frontalFocusEnabled
+        cover.setFrontalFocusEnabled(newValue)
+        onFrontalFocusEnabledChange(newValue)
+    }
+
+    @objc private func frontalFocusWidthChanged(_ sender: NSSlider) {
+        let width = CGFloat(sender.doubleValue)
+        cover.setFrontalFocusWidth(width)
+        onFrontalFocusWidthChange(width)
     }
 
     @objc private func quitTapped() {

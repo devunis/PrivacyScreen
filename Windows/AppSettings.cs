@@ -5,6 +5,8 @@ namespace PrivacyScreen.Windows;
 internal sealed class AppSettings
 {
     public float CoverAlpha { get; set; } = 0.92f;
+    public bool FrontalFocusEnabled { get; set; }
+    public float FrontalFocusWidth { get; set; } = 0.25f;
     public List<string> TargetProcesses { get; set; } = [];
 }
 

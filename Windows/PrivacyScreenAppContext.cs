@@ -12,11 +12,15 @@ internal sealed class PrivacyScreenAppContext : ApplicationContext
     private readonly Timer _timer;
     private bool _isEnabled;
     private float _coverAlpha;
+    private bool _frontalFocusEnabled;
+    private float _frontalFocusWidth;
 
     public PrivacyScreenAppContext()
     {
         var settings = SettingsStore.Load();
         _coverAlpha = Math.Clamp(settings.CoverAlpha, 0.3f, 1.0f);
+        _frontalFocusEnabled = settings.FrontalFocusEnabled;
+        _frontalFocusWidth = Math.Clamp(settings.FrontalFocusWidth, 0.25f, 1.0f);
         _targets = new HashSet<string>(settings.TargetProcesses, StringComparer.OrdinalIgnoreCase);
 
         _menu = new ContextMenuStrip();
@@ -93,6 +97,8 @@ internal sealed class PrivacyScreenAppContext : ApplicationContext
 
         _menu.Items.Add(targetMenu);
         _menu.Items.Add(CreateDarknessControl());
+        _menu.Items.Add(CreateFrontalFocusToggle());
+        _menu.Items.Add(CreateFrontalFocusWidthControl());
         _menu.Items.Add(new ToolStripSeparator());
         _menu.Items.Add(new ToolStripMenuItem("Quit", null, (_, _) => ExitThread()));
     }
@@ -129,7 +135,75 @@ internal sealed class PrivacyScreenAppContext : ApplicationContext
             _coverAlpha = trackBar.Value / 100f;
             foreach (var overlay in _overlays)
             {
-                overlay.SetAlpha(_coverAlpha);
+                overlay.SetAppearance(_coverAlpha, _frontalFocusEnabled, _frontalFocusWidth);
+            }
+
+            SaveSettings();
+        };
+        panel.Controls.Add(trackBar);
+
+        return new ToolStripControlHost(panel)
+        {
+            AutoSize = false,
+            Width = panel.Width + 4,
+            Height = panel.Height + 4
+        };
+    }
+
+    private ToolStripMenuItem CreateFrontalFocusToggle()
+    {
+        var item = new ToolStripMenuItem("Vertical privacy lines (software)")
+        {
+            Checked = _frontalFocusEnabled
+        };
+        item.Click += (_, _) =>
+        {
+            _frontalFocusEnabled = !_frontalFocusEnabled;
+            foreach (var overlay in _overlays)
+            {
+                overlay.SetAppearance(_coverAlpha, _frontalFocusEnabled, _frontalFocusWidth);
+            }
+
+            SaveSettings();
+            RefreshMenu();
+        };
+        return item;
+    }
+
+    private ToolStripControlHost CreateFrontalFocusWidthControl()
+    {
+        var panel = new Panel
+        {
+            Width = 220,
+            Height = 52
+        };
+
+        var label = new Label
+        {
+            Text = "Line spacing",
+            Left = 8,
+            Top = 4,
+            Width = 160
+        };
+        panel.Controls.Add(label);
+
+        var trackBar = new TrackBar
+        {
+            Left = 8,
+            Top = 20,
+            Width = 200,
+            TickStyle = TickStyle.None,
+            Minimum = 25,
+            Maximum = 100,
+            Value = (int)Math.Round(_frontalFocusWidth * 100f),
+            Enabled = _frontalFocusEnabled
+        };
+        trackBar.ValueChanged += (_, _) =>
+        {
+            _frontalFocusWidth = trackBar.Value / 100f;
+            foreach (var overlay in _overlays)
+            {
+                overlay.SetAppearance(_coverAlpha, _frontalFocusEnabled, _frontalFocusWidth);
             }
 
             SaveSettings();
@@ -225,7 +299,7 @@ internal sealed class PrivacyScreenAppContext : ApplicationContext
         ClearOverlays();
         foreach (var screen in screens)
         {
-            var overlay = new OverlayForm(screen.Bounds, _coverAlpha);
+            var overlay = new OverlayForm(screen.Bounds, _coverAlpha, _frontalFocusEnabled, _frontalFocusWidth);
             overlay.Show();
             _overlays.Add(overlay);
         }
@@ -353,6 +427,8 @@ internal sealed class PrivacyScreenAppContext : ApplicationContext
         SettingsStore.Save(new AppSettings
         {
             CoverAlpha = _coverAlpha,
+            FrontalFocusEnabled = _frontalFocusEnabled,
+            FrontalFocusWidth = _frontalFocusWidth,
             TargetProcesses = _targets.OrderBy(v => v, StringComparer.OrdinalIgnoreCase).ToList()
         });
     }

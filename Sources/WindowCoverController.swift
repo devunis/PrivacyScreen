@@ -8,8 +8,18 @@ import QuartzCore
 private final class CoverView: NSView {
     private var clipRects: [NSRect] = []
     private var fillRects: [NSRect] = []
+    private var frontalFocusEnabled = false
+    private var frontalFocusWidth: CGFloat = 0.65
     var cornerRadius: CGFloat = 10
     var coverColor: NSColor = .black { didSet { needsDisplay = true } }
+
+    func setFrontalFocus(enabled: Bool, width: CGFloat) {
+        let clampedWidth = max(0.25, min(width, 1.0))
+        if frontalFocusEnabled == enabled && frontalFocusWidth == clampedWidth { return }
+        frontalFocusEnabled = enabled
+        frontalFocusWidth = clampedWidth
+        needsDisplay = true
+    }
 
     /// 변화가 있을 때만 다시 그린다(불필요한 60fps 재그리기 방지).
     func setGeometry(clip: [NSRect], fill: [NSRect]) {
@@ -28,12 +38,48 @@ private final class CoverView: NSView {
         for rect in clipRects { clipPath.appendRect(rect) }
         clipPath.setClip()
 
-        let fillPath = NSBezierPath()
         for rect in fillRects {
-            fillPath.appendRoundedRect(rect, xRadius: cornerRadius, yRadius: cornerRadius)
+            let fillPath = NSBezierPath(roundedRect: rect, xRadius: cornerRadius, yRadius: cornerRadius)
+            if frontalFocusEnabled {
+                drawFrontalFocusFill(path: fillPath, rect: rect)
+            } else {
+                coverColor.setFill()
+                fillPath.fill()
+            }
         }
-        coverColor.setFill()
-        fillPath.fill() // 클립 + 단일 fill: 겹쳐도 한 번, 겉모서리는 둥글게
+    }
+
+    private func drawFrontalFocusFill(path: NSBezierPath, rect: NSRect) {
+        guard let context = NSGraphicsContext.current?.cgContext else {
+            coverColor.setFill()
+            path.fill()
+            return
+        }
+
+        let baseAlpha = coverColor.alphaComponent
+        let baseFillAlpha = min(1.0, baseAlpha * 0.55)
+        let lineAlpha = min(1.0, baseAlpha + 0.08)
+        let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2.0
+        let pixel = 1.0 / scale // 실제 1px
+        let stepPixels = max(1, Int((1.0 + frontalFocusWidth * 7.0).rounded()))
+        let pitch = CGFloat(stepPixels) * pixel
+        let lineWidth = pixel
+
+        context.saveGState()
+        path.addClip()
+        NSColor.black.withAlphaComponent(baseFillAlpha).setFill()
+        path.fill()
+        context.setShouldAntialias(false)
+        NSColor.black.withAlphaComponent(lineAlpha).setFill()
+
+        var x = floor(rect.minX / pixel) * pixel
+        while x < rect.maxX {
+            let stripe = NSRect(x: x, y: rect.minY, width: lineWidth, height: rect.height)
+            NSBezierPath(rect: stripe).fill()
+            x += pitch
+        }
+
+        context.restoreGState()
     }
 
     // 클릭 통과
@@ -49,6 +95,8 @@ final class WindowCoverController {
     private(set) var targets: [String: String] = [:]
 
     private(set) var coverAlpha: CGFloat
+    private(set) var frontalFocusEnabled: Bool
+    private(set) var frontalFocusWidth: CGFloat
     private var overlays: [NSWindow] = [] // 화면당 하나
     private var displayLink: CADisplayLink?
     private var timer: Timer? // macOS 14 미만 폴백
@@ -57,8 +105,10 @@ final class WindowCoverController {
 
     var hasTargets: Bool { !targets.isEmpty }
 
-    init(alpha: CGFloat) {
+    init(alpha: CGFloat, frontalFocusEnabled: Bool, frontalFocusWidth: CGFloat) {
         self.coverAlpha = alpha
+        self.frontalFocusEnabled = frontalFocusEnabled
+        self.frontalFocusWidth = max(0.25, min(frontalFocusWidth, 1.0))
         if let saved = UserDefaults.standard.dictionary(forKey: targetsKey) as? [String: String] {
             targets = saved
         }
@@ -93,7 +143,27 @@ final class WindowCoverController {
     func setAlpha(_ value: CGFloat) {
         coverAlpha = value
         for window in overlays {
-            (window.contentView as? CoverView)?.coverColor = coverColor
+            if let view = window.contentView as? CoverView {
+                applyAppearance(to: view)
+            }
+        }
+    }
+
+    func setFrontalFocusEnabled(_ enabled: Bool) {
+        frontalFocusEnabled = enabled
+        for window in overlays {
+            if let view = window.contentView as? CoverView {
+                applyAppearance(to: view)
+            }
+        }
+    }
+
+    func setFrontalFocusWidth(_ width: CGFloat) {
+        frontalFocusWidth = max(0.25, min(width, 1.0))
+        for window in overlays {
+            if let view = window.contentView as? CoverView {
+                applyAppearance(to: view)
+            }
         }
     }
 
@@ -164,12 +234,17 @@ final class WindowCoverController {
         window.isReleasedWhenClosed = false
 
         let view = CoverView(frame: NSRect(origin: .zero, size: screen.frame.size))
-        view.coverColor = coverColor
+        applyAppearance(to: view)
         window.contentView = view
 
         window.setFrame(screen.frame, display: false)
         window.orderFrontRegardless()
         return window
+    }
+
+    private func applyAppearance(to view: CoverView) {
+        view.coverColor = coverColor
+        view.setFrontalFocus(enabled: frontalFocusEnabled, width: frontalFocusWidth)
     }
 
     private func update() {
