@@ -128,7 +128,7 @@ internal static class Win32
                 return true;
             }
 
-            _ = GetWindowThreadProcessId(hWnd, out var processIdUInt);
+            GetWindowThreadProcessId(hWnd, out var processIdUInt);
             var processId = unchecked((int)processIdUInt);
             if (processId == currentPid)
             {
