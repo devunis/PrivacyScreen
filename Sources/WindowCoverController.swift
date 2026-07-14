@@ -45,42 +45,31 @@ private final class CoverView: NSView {
             fillBounds = fillBounds.isNull ? rect : fillBounds.union(rect)
         }
 
+        // 기본 덮개(어둡기 슬라이더 값)를 항상 칠하고,
+        // 세로선 필터가 켜져 있으면 그 위에 불투명 세로 슬랫을 얹는다(켜면 더 가려짐).
+        coverColor.setFill()
+        fillPath.fill()
         if frontalFocusEnabled {
-            drawFrontalFocusFill(path: fillPath, bounds: fillBounds)
-        } else {
-            coverColor.setFill()
-            fillPath.fill()
+            drawVerticalSlats(over: fillPath, bounds: fillBounds)
         }
     }
 
-    private func drawFrontalFocusFill(path: NSBezierPath, bounds: NSRect) {
-        guard let context = NSGraphicsContext.current?.cgContext else {
-            coverColor.setFill()
-            path.fill()
-            return
-        }
+    private func drawVerticalSlats(over path: NSBezierPath, bounds: NSRect) {
+        guard let context = NSGraphicsContext.current?.cgContext, !bounds.isNull else { return }
 
-        let baseAlpha = coverColor.alphaComponent
-        let baseFillAlpha = min(1.0, baseAlpha * 0.10)
-        let lineAlpha = min(1.0, baseAlpha * 0.10)
         let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2.0
         let pixel = 1.0 / scale // 실제 1px
-        let pitchPixelsRaw = 1.0 + frontalFocusWidth * 12.0
-        let pitchPixels = max(1.0, (pitchPixelsRaw * 4.0).rounded() / 4.0) // 0.25px step
+        let pitchPixels = max(2.0, 1.0 + frontalFocusWidth * 12.0) // 슬랫 간격(최소 2px)
         let pitch = pitchPixels * pixel
-        let lineWidth = pixel // 실제 1px 고정
 
         context.saveGState()
         path.addClip()
-        NSColor.black.withAlphaComponent(baseFillAlpha).setFill()
-        path.fill()
         context.setShouldAntialias(false)
-        NSColor.black.withAlphaComponent(lineAlpha).setFill()
+        NSColor.black.setFill() // 불투명 슬랫
 
         var x = floor(bounds.minX / pixel) * pixel
         while x < bounds.maxX {
-            let stripe = NSRect(x: x, y: bounds.minY, width: lineWidth, height: bounds.height)
-            NSBezierPath(rect: stripe).fill()
+            NSBezierPath(rect: NSRect(x: x, y: bounds.minY, width: pixel, height: bounds.height)).fill()
             x += pitch
         }
 

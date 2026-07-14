@@ -9,7 +9,7 @@ internal sealed class PrivacyScreenAppContext : ApplicationContext
     private readonly ContextMenuStrip _menu;
     private readonly HashSet<string> _targets;
     private readonly List<OverlayForm> _overlays = [];
-    private readonly Timer _timer;
+    private readonly System.Windows.Forms.Timer _timer;
     private bool _isEnabled;
     private float _coverAlpha;
     private bool _frontalFocusEnabled;
@@ -25,6 +25,7 @@ internal sealed class PrivacyScreenAppContext : ApplicationContext
 
         _menu = new ContextMenuStrip();
         _menu.Opening += (_, _) => RefreshMenu();
+        _menu.Closed += (_, _) => SaveSettings(); // 슬라이더 드래그 중이 아닌 닫힐 때 한 번 저장(디스크 I/O 절약)
 
         _trayIcon = new NotifyIcon
         {
@@ -34,7 +35,7 @@ internal sealed class PrivacyScreenAppContext : ApplicationContext
             ContextMenuStrip = _menu
         };
 
-        _timer = new Timer { Interval = 16 };
+        _timer = new System.Windows.Forms.Timer { Interval = 16 };
         _timer.Tick += (_, _) => UpdateOverlays();
 
         if (_targets.Count > 0)
@@ -63,6 +64,12 @@ internal sealed class PrivacyScreenAppContext : ApplicationContext
 
     private void RefreshMenu()
     {
+        // 이전 항목(호스팅된 TrackBar/Panel 포함)을 정리해 핸들 누수를 막는다.
+        foreach (ToolStripItem item in _menu.Items)
+        {
+            item.Dispose();
+        }
+
         _menu.Items.Clear();
 
         var targetLabel = _targets.Count == 0
@@ -137,8 +144,7 @@ internal sealed class PrivacyScreenAppContext : ApplicationContext
             {
                 overlay.SetAppearance(_coverAlpha, _frontalFocusEnabled, _frontalFocusWidth);
             }
-
-            SaveSettings();
+            // 저장은 메뉴가 닫힐 때 일괄 처리(드래그 중 디스크 쓰기 방지).
         };
         panel.Controls.Add(trackBar);
 
@@ -205,8 +211,7 @@ internal sealed class PrivacyScreenAppContext : ApplicationContext
             {
                 overlay.SetAppearance(_coverAlpha, _frontalFocusEnabled, _frontalFocusWidth);
             }
-
-            SaveSettings();
+            // 저장은 메뉴가 닫힐 때 일괄 처리.
         };
         panel.Controls.Add(trackBar);
 
@@ -277,13 +282,13 @@ internal sealed class PrivacyScreenAppContext : ApplicationContext
 
     private void EnsureOverlayForms()
     {
-        var screens = Screen.AllScreens;
-        var requiresRebuild = _overlays.Count != screens.Length;
+        var monitors = Win32.EnumerateMonitorBounds();
+        var requiresRebuild = _overlays.Count != monitors.Count;
         if (!requiresRebuild)
         {
-            for (var i = 0; i < screens.Length; i++)
+            for (var i = 0; i < monitors.Count; i++)
             {
-                if (_overlays[i].Bounds != screens[i].Bounds)
+                if (_overlays[i].PhysicalBounds != monitors[i])
                 {
                     requiresRebuild = true;
                     break;
@@ -297,9 +302,9 @@ internal sealed class PrivacyScreenAppContext : ApplicationContext
         }
 
         ClearOverlays();
-        foreach (var screen in screens)
+        foreach (var monitor in monitors)
         {
-            var overlay = new OverlayForm(screen.Bounds, _coverAlpha, _frontalFocusEnabled, _frontalFocusWidth);
+            var overlay = new OverlayForm(monitor, _coverAlpha, _frontalFocusEnabled, _frontalFocusWidth);
             overlay.Show();
             _overlays.Add(overlay);
         }
@@ -328,9 +333,9 @@ internal sealed class PrivacyScreenAppContext : ApplicationContext
 
         for (var i = 0; i < _overlays.Count; i++)
         {
-            var screen = Screen.AllScreens[i];
-            var fillLocal = IntersectAndLocalize(fillRects, screen.Bounds);
-            var clipLocal = IntersectAndLocalize(clipRects, screen.Bounds);
+            var monitor = _overlays[i].PhysicalBounds;
+            var fillLocal = IntersectAndLocalize(fillRects, monitor).ToList();
+            var clipLocal = IntersectAndLocalize(clipRects, monitor).ToList();
             _overlays[i].SetGeometry(clipLocal, fillLocal);
         }
     }

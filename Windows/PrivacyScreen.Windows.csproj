@@ -6,5 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <!-- 물리 픽셀 좌표로 오버레이를 배치하므로 Per-Monitor-V2 로 통일(GetWindowRect ↔ 모니터 영역 일치). -->
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
   </PropertyGroup>
 </Project>
