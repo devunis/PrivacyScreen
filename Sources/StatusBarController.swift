@@ -179,7 +179,7 @@ final class StatusBarController: NSObject, NSMenuDelegate {
 
         let slider = NSSlider(
             value: Double(cover.frontalFocusWidth),
-            minValue: 0.25,
+            minValue: 0.01,
             maxValue: 1.0,
             target: self,
             action: #selector(frontalFocusWidthChanged(_:))

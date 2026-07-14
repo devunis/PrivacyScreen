@@ -14,7 +14,7 @@ private final class CoverView: NSView {
     var coverColor: NSColor = .black { didSet { needsDisplay = true } }
 
     func setFrontalFocus(enabled: Bool, width: CGFloat) {
-        let clampedWidth = max(0.25, min(width, 1.0))
+        let clampedWidth = max(0.01, min(width, 1.0))
         if frontalFocusEnabled == enabled && frontalFocusWidth == clampedWidth { return }
         frontalFocusEnabled = enabled
         frontalFocusWidth = clampedWidth
@@ -38,18 +38,22 @@ private final class CoverView: NSView {
         for rect in clipRects { clipPath.appendRect(rect) }
         clipPath.setClip()
 
+        let fillPath = NSBezierPath()
+        var fillBounds = NSRect.null
         for rect in fillRects {
-            let fillPath = NSBezierPath(roundedRect: rect, xRadius: cornerRadius, yRadius: cornerRadius)
-            if frontalFocusEnabled {
-                drawFrontalFocusFill(path: fillPath, rect: rect)
-            } else {
-                coverColor.setFill()
-                fillPath.fill()
-            }
+            fillPath.appendRoundedRect(rect, xRadius: cornerRadius, yRadius: cornerRadius)
+            fillBounds = fillBounds.isNull ? rect : fillBounds.union(rect)
+        }
+
+        if frontalFocusEnabled {
+            drawFrontalFocusFill(path: fillPath, bounds: fillBounds)
+        } else {
+            coverColor.setFill()
+            fillPath.fill()
         }
     }
 
-    private func drawFrontalFocusFill(path: NSBezierPath, rect: NSRect) {
+    private func drawFrontalFocusFill(path: NSBezierPath, bounds: NSRect) {
         guard let context = NSGraphicsContext.current?.cgContext else {
             coverColor.setFill()
             path.fill()
@@ -57,13 +61,14 @@ private final class CoverView: NSView {
         }
 
         let baseAlpha = coverColor.alphaComponent
-        let baseFillAlpha = min(1.0, baseAlpha * 0.55)
-        let lineAlpha = min(1.0, baseAlpha + 0.08)
+        let baseFillAlpha = min(1.0, baseAlpha * 0.10)
+        let lineAlpha = min(1.0, baseAlpha * 0.10)
         let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2.0
         let pixel = 1.0 / scale // 실제 1px
-        let stepPixels = max(1, Int((1.0 + frontalFocusWidth * 7.0).rounded()))
-        let pitch = CGFloat(stepPixels) * pixel
-        let lineWidth = pixel
+        let pitchPixelsRaw = 1.0 + frontalFocusWidth * 12.0
+        let pitchPixels = max(1.0, (pitchPixelsRaw * 4.0).rounded() / 4.0) // 0.25px step
+        let pitch = pitchPixels * pixel
+        let lineWidth = pixel // 실제 1px 고정
 
         context.saveGState()
         path.addClip()
@@ -72,9 +77,9 @@ private final class CoverView: NSView {
         context.setShouldAntialias(false)
         NSColor.black.withAlphaComponent(lineAlpha).setFill()
 
-        var x = floor(rect.minX / pixel) * pixel
-        while x < rect.maxX {
-            let stripe = NSRect(x: x, y: rect.minY, width: lineWidth, height: rect.height)
+        var x = floor(bounds.minX / pixel) * pixel
+        while x < bounds.maxX {
+            let stripe = NSRect(x: x, y: bounds.minY, width: lineWidth, height: bounds.height)
             NSBezierPath(rect: stripe).fill()
             x += pitch
         }
@@ -108,7 +113,7 @@ final class WindowCoverController {
     init(alpha: CGFloat, frontalFocusEnabled: Bool, frontalFocusWidth: CGFloat) {
         self.coverAlpha = alpha
         self.frontalFocusEnabled = frontalFocusEnabled
-        self.frontalFocusWidth = max(0.25, min(frontalFocusWidth, 1.0))
+        self.frontalFocusWidth = max(0.01, min(frontalFocusWidth, 1.0))
         if let saved = UserDefaults.standard.dictionary(forKey: targetsKey) as? [String: String] {
             targets = saved
         }
@@ -159,7 +164,7 @@ final class WindowCoverController {
     }
 
     func setFrontalFocusWidth(_ width: CGFloat) {
-        frontalFocusWidth = max(0.25, min(width, 1.0))
+        frontalFocusWidth = max(0.01, min(width, 1.0))
         for window in overlays {
             if let view = window.contentView as? CoverView {
                 applyAppearance(to: view)

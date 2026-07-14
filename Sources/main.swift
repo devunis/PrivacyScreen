@@ -8,7 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let frontalFocusEnabledKey = "frontalFocusEnabled"
     private let frontalFocusWidthKey = "frontalFocusWidth"
     private let defaultAlpha: CGFloat = 0.92
-    private let defaultFrontalFocusWidth: CGFloat = 0.25
+    private let defaultFrontalFocusWidth: CGFloat = 0.1
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let savedAlpha = UserDefaults.standard.object(forKey: alphaKey) as? Double
