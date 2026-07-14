@@ -20,7 +20,7 @@ internal sealed class PrivacyScreenAppContext : ApplicationContext
         var settings = SettingsStore.Load();
         _coverAlpha = Math.Clamp(settings.CoverAlpha, 0.3f, 1.0f);
         _frontalFocusEnabled = settings.FrontalFocusEnabled;
-        _frontalFocusWidth = Math.Clamp(settings.FrontalFocusWidth, 0.25f, 1.0f);
+        _frontalFocusWidth = Math.Clamp(settings.FrontalFocusWidth, 0.01f, 1.0f);
         _targets = new HashSet<string>(settings.TargetProcesses, StringComparer.OrdinalIgnoreCase);
 
         _menu = new ContextMenuStrip();
@@ -193,7 +193,7 @@ internal sealed class PrivacyScreenAppContext : ApplicationContext
             Top = 20,
             Width = 200,
             TickStyle = TickStyle.None,
-            Minimum = 25,
+            Minimum = 1,
             Maximum = 100,
             Value = (int)Math.Round(_frontalFocusWidth * 100f),
             Enabled = _frontalFocusEnabled

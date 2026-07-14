@@ -32,7 +32,7 @@ internal sealed class OverlayForm : Form
         DoubleBuffered = true;
         _alpha = Math.Clamp(alpha, 0.3f, 1.0f);
         _frontalFocusEnabled = frontalFocusEnabled;
-        _frontalFocusWidth = Math.Clamp(frontalFocusWidth, 0.25f, 1.0f);
+        _frontalFocusWidth = Math.Clamp(frontalFocusWidth, 0.01f, 1.0f);
     }
 
     protected override bool ShowWithoutActivation => true;
@@ -58,7 +58,7 @@ internal sealed class OverlayForm : Form
     {
         _alpha = Math.Clamp(alpha, 0.3f, 1.0f);
         _frontalFocusEnabled = frontalFocusEnabled;
-        _frontalFocusWidth = Math.Clamp(frontalFocusWidth, 0.25f, 1.0f);
+        _frontalFocusWidth = Math.Clamp(frontalFocusWidth, 0.01f, 1.0f);
         Invalidate();
     }
 
@@ -87,38 +87,46 @@ internal sealed class OverlayForm : Form
         }
 
         e.Graphics.SetClip(clipPath);
+        using var fillPath = new GraphicsPath();
+        var fillBounds = Rectangle.Empty;
+        var hasBounds = false;
         foreach (var fillRect in _fillRects)
         {
-            using var path = CreateRoundedRectPath(fillRect, 10f);
-            if (_frontalFocusEnabled)
-            {
-                FillVerticalLouver(e.Graphics, path, fillRect);
-            }
-            else
-            {
-                using var brush = new SolidBrush(Color.FromArgb((int)(_alpha * 255), 0, 0, 0));
-                e.Graphics.FillPath(brush, path);
-            }
+            using var rounded = CreateRoundedRectPath(fillRect, 10f);
+            fillPath.AddPath(rounded, false);
+            fillBounds = hasBounds ? Rectangle.Union(fillBounds, fillRect) : fillRect;
+            hasBounds = true;
+        }
+
+        if (_frontalFocusEnabled)
+        {
+            FillVerticalLouver(e.Graphics, fillPath, fillBounds);
+        }
+        else
+        {
+            using var brush = new SolidBrush(Color.FromArgb((int)(_alpha * 255), 0, 0, 0));
+            e.Graphics.FillPath(brush, fillPath);
         }
     }
 
-    private void FillVerticalLouver(Graphics graphics, GraphicsPath path, Rectangle fillRect)
+    private void FillVerticalLouver(Graphics graphics, GraphicsPath path, Rectangle fillBounds)
     {
-        var baseFillAlpha = Math.Max(0.06f, _alpha * 0.22f);
-        var lineAlpha = Math.Min(1.0f, _alpha + 0.12f);
-        var stepPixels = Math.Max(1, (int)Math.Round(1.0f + (_frontalFocusWidth * 7.0f)));
-        var pitch = (float)stepPixels;
+        var baseFillAlpha = Math.Min(1.0f, _alpha * 0.10f);
+        var lineAlpha = Math.Min(1.0f, _alpha * 0.10f);
+        var pitchPixelsRaw = 1.0f + (_frontalFocusWidth * 12.0f);
+        var pitchPixels = Math.Max(1.0f, MathF.Round(pitchPixelsRaw * 4.0f) / 4.0f);
+        var pitch = pitchPixels;
         const float lineWidth = 1.0f;
         using var baseBrush = new SolidBrush(Color.FromArgb((int)(baseFillAlpha * 255), 0, 0, 0));
-        using var brush = new SolidBrush(Color.FromArgb((int)(lineAlpha * 255), 0, 0, 0));
+        using var pen = new Pen(Color.FromArgb((int)(lineAlpha * 255), 0, 0, 0), lineWidth);
         var state = graphics.Save();
         graphics.SetClip(path, CombineMode.Intersect);
         graphics.FillPath(baseBrush, path);
         var oldSmoothing = graphics.SmoothingMode;
-        graphics.SmoothingMode = SmoothingMode.None;
-        for (var x = (float)fillRect.Left; x < fillRect.Right; x += pitch)
+        graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        for (var x = (float)fillBounds.Left; x < fillBounds.Right; x += pitch)
         {
-            graphics.FillRectangle(brush, (float)Math.Floor(x), fillRect.Top, lineWidth, fillRect.Height);
+            graphics.DrawLine(pen, x, fillBounds.Top, x, fillBounds.Bottom);
         }
 
         graphics.SmoothingMode = oldSmoothing;
