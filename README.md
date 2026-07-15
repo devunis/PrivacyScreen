@@ -1,4 +1,4 @@
-# PrivacyScreen
+# dont-look-my-monitor
 
 선택한 앱의 창만 어두운 덮개로 가려, 옆·뒤 사람의 훔쳐보기를 줄이는 데스크톱 유틸리티.
 
